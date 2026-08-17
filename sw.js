@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ecko-cache-v1';
+const CACHE_NAME = 'ecko-cache-v2';
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (e) => {
@@ -16,11 +16,18 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-  // Network-first for external APIs (weather, maps, AI, etc.), cache-first for our own shell
   const url = new URL(e.request.url);
-  if (url.origin === self.location.origin) {
-    e.respondWith(
-      caches.match(e.request).then((cached) => cached || fetch(e.request))
-    );
-  }
+  if (url.origin !== self.location.origin) return;
+
+  // Network-first for our own app shell — always tries to get the latest
+  // version first, and only falls back to the cached copy if offline.
+  e.respondWith(
+    fetch(e.request)
+      .then((res) => {
+        const clone = res.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
+        return res;
+      })
+      .catch(() => caches.match(e.request))
+  );
 });
